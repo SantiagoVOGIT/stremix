@@ -60,6 +60,16 @@ export const fetchSubtitles = async (type = 'movie', videoId) => {
 export const srtToVtt = (srtContent, delaySeconds = 0) => {
   if (!srtContent) return '';
 
+  // If already WebVTT format
+  if (srtContent.trim().startsWith('WEBVTT')) {
+    if (delaySeconds === 0) return srtContent;
+    return srtContent.replace(/(\d{2}:\d{2}:\d{2}[\.,]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[\.,]\d{3})/g, (match, p1, p2) => {
+      const s1 = adjustTimestamp(p1.replace(',', '.'), delaySeconds);
+      const s2 = adjustTimestamp(p2.replace(',', '.'), delaySeconds);
+      return `${s1} --> ${s2}`;
+    });
+  }
+
   let vtt = 'WEBVTT\n\n';
   
   // Normalize line endings
@@ -128,19 +138,62 @@ function adjustTimestamp(ts, offset) {
 }
 
 /**
+ * Safely decodes subtitle buffer supporting UTF-8 and Windows-1252 / ISO-8859-1
+ */
+const decodeSubtitleBuffer = (arrayBuffer) => {
+  const bytes = new Uint8Array(arrayBuffer);
+  try {
+    // Strict UTF-8 decoder
+    const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+    return utf8Decoder.decode(bytes);
+  } catch (e) {
+    try {
+      // Common Spanish / European SRT charset fallback
+      const win1252Decoder = new TextDecoder('windows-1252');
+      return win1252Decoder.decode(bytes);
+    } catch (e2) {
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+  }
+};
+
+/**
  * Load subtitle URL and return a Blob WebVTT URL
  */
 export const loadSubtitleVttBlob = async (subUrl, delaySeconds = 0) => {
   try {
     const proxied = `/api/proxy?url=${encodeURIComponent(subUrl)}`;
-    const res = await fetch(proxied);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(proxied, { signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) throw new Error('Failed to load subtitle file');
-    const text = await res.text();
+    const arrayBuf = await res.arrayBuffer();
+    const text = decodeSubtitleBuffer(arrayBuf);
     const vtt = srtToVtt(text, delaySeconds);
     const blob = new Blob([vtt], { type: 'text/vtt' });
     return URL.createObjectURL(blob);
   } catch (err) {
     console.error('Error loading subtitle blob:', err);
+    return null;
+  }
+};
+
+/**
+ * Fetch raw subtitle content for dynamic delay shifting
+ */
+export const loadSubtitleText = async (subUrl) => {
+  try {
+    const proxied = `/api/proxy?url=${encodeURIComponent(subUrl)}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(proxied, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('Failed to load subtitle file');
+    const arrayBuf = await res.arrayBuffer();
+    return decodeSubtitleBuffer(arrayBuf);
+  } catch (err) {
+    console.error('Error loading subtitle text:', err);
     return null;
   }
 };

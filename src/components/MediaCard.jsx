@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Play, Star, Bookmark, Check } from 'lucide-react';
 import { isFavorite, toggleFavorite } from '../services/storage';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 
 export const MediaCard = ({ item, onSelect, onQuickPlay }) => {
   const [favorite, setFavorite] = useState(isFavorite(item.id));
@@ -38,32 +40,51 @@ export const MediaCard = ({ item, onSelect, onQuickPlay }) => {
         />
 
         {/* Top Badges */}
-        <div className="card-badges">
+        <div style={{
+          position: 'absolute',
+          top: '0.5rem',
+          left: '0.5rem',
+          right: '0.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          zIndex: 3,
+          pointerEvents: 'none'
+        }}>
           {rating ? (
-            <span className="card-rating-badge">
-              <Star size={11} fill="#fbbf24" />
+            <Badge variant="secondary" style={{ backgroundColor: 'rgba(9, 9, 11, 0.85)', backdropFilter: 'blur(4px)', color: '#fbbf24', fontSize: '0.7rem', padding: '1px 6px' }}>
+              <Star size={10} fill="#fbbf24" />
               <span>{rating}</span>
-            </span>
+            </Badge>
           ) : (
             <span></span>
           )}
-          <span className="card-type-badge">{typeText}</span>
+          <Badge variant="outline" style={{ backgroundColor: 'rgba(9, 9, 11, 0.85)', backdropFilter: 'blur(4px)', fontSize: '0.65rem', textTransform: 'uppercase', padding: '1px 6px' }}>
+            {typeText}
+          </Badge>
         </div>
 
-        {/* Hover Overlay with Quick Actions */}
+        {/* Hover Overlay */}
         <div className="card-overlay">
-          <div className="card-quick-actions">
-            <button className="quick-play-btn" onClick={handlePlayClick}>
-              <Play size={15} fill="#fff" />
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <Button 
+              variant="default"
+              size="sm"
+              style={{ flex: 1, fontSize: '0.8rem' }}
+              onClick={handlePlayClick}
+            >
+              <Play size={13} fill="currentColor" />
               <span>Ver</span>
-            </button>
-            <button 
-              className={`quick-fav-btn ${favorite ? 'active' : ''}`}
+            </Button>
+            <Button 
+              variant={favorite ? 'default' : 'secondary'}
+              size="icon"
+              style={{ width: '1.85rem', height: '1.85rem', flexShrink: 0 }}
               onClick={handleToggleFav}
               title={favorite ? 'Quitar de guardados' : 'Guardar en biblioteca'}
             >
-              {favorite ? <Check size={16} /> : <Bookmark size={16} />}
-            </button>
+              {favorite ? <Check size={13} /> : <Bookmark size={13} />}
+            </Button>
           </div>
         </div>
       </div>
@@ -73,7 +94,7 @@ export const MediaCard = ({ item, onSelect, onQuickPlay }) => {
         <div className="card-meta-row">
           <span>{year}</span>
           {item.genres && item.genres.length > 0 && (
-            <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ maxWidth: '6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {item.genres[0]}
             </span>
           )}

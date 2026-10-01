@@ -1,4 +1,5 @@
 // Local storage service for Stremix application state
+// Provides resilient in-memory fallback when localStorage is blocked or unavailable
 
 const SETTINGS_KEY = 'stremix_settings';
 const FAVORITES_KEY = 'stremix_favorites';
@@ -12,7 +13,7 @@ const DEFAULT_SETTINGS = {
   aiostreamPassword: '',
   aiostreamUuid: '',
   preferredResolution: 'all', // 'all', '4k', '1080p', '720p'
-  sortBy: 'quality', // 'quality', 'seeders', 'size'
+  sortBy: 'quality', // 'quality', 'spanish', 'seeders', 'size'
   autoPlayNext: true,
   subtitlesLanguage: 'spa', // 'spa', 'eng', 'all'
   subtitlesFontSize: 'medium', // 'small', 'medium', 'large'
@@ -20,12 +21,45 @@ const DEFAULT_SETTINGS = {
   useProxy: true, // Use dev proxy to bypass CORS
 };
 
+// In-memory fallback map for environments where localStorage is not available or blocked
+const memoryStore = new Map();
+
+const safeStorage = {
+  getItem: (key) => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const val = localStorage.getItem(key);
+        if (val !== null) return val;
+      }
+    } catch (e) {
+      // LocalStorage access restricted (e.g. private mode)
+    }
+    return memoryStore.get(key) || null;
+  },
+  setItem: (key, val) => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, val);
+      }
+    } catch (e) {}
+    memoryStore.set(key, val);
+  },
+  removeItem: (key) => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    } catch (e) {}
+    memoryStore.delete(key);
+  }
+};
+
 export const getSettings = () => {
   try {
-    const saved = localStorage.getItem(SETTINGS_KEY);
+    const saved = safeStorage.getItem(SETTINGS_KEY);
     return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
   } catch (e) {
-    console.error('Error reading settings from localStorage:', e);
+    console.warn('Error reading settings:', e);
     return DEFAULT_SETTINGS;
   }
 };
@@ -34,7 +68,7 @@ export const saveSettings = (newSettings) => {
   try {
     const current = getSettings();
     const merged = { ...current, ...newSettings };
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+    safeStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
     return merged;
   } catch (e) {
     console.error('Error saving settings:', e);
@@ -45,7 +79,7 @@ export const saveSettings = (newSettings) => {
 // Favorites / Watchlist
 export const getFavorites = () => {
   try {
-    const saved = localStorage.getItem(FAVORITES_KEY);
+    const saved = safeStorage.getItem(FAVORITES_KEY);
     return saved ? JSON.parse(saved) : [];
   } catch (e) {
     return [];
@@ -77,7 +111,7 @@ export const toggleFavorite = (mediaItem) => {
         addedAt: Date.now()
       });
     }
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+    safeStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
     return !exists;
   } catch (e) {
     console.error('Error updating favorites:', e);
@@ -88,7 +122,7 @@ export const toggleFavorite = (mediaItem) => {
 // Continue Watching Progress
 export const getContinueWatching = () => {
   try {
-    const saved = localStorage.getItem(PROGRESS_KEY);
+    const saved = safeStorage.getItem(PROGRESS_KEY);
     return saved ? JSON.parse(saved) : [];
   } catch (e) {
     return [];
@@ -102,7 +136,6 @@ export const saveProgress = (progressData) => {
     const key = progressData.videoId || progressData.id;
     list = list.filter((item) => (item.videoId || item.id) !== key);
 
-    // If progress is near completion (> 95%), we still keep it or mark as watched
     list.unshift({
       ...progressData,
       updatedAt: Date.now(),
@@ -110,7 +143,7 @@ export const saveProgress = (progressData) => {
 
     // Limit to 30 items
     if (list.length > 30) list = list.slice(0, 30);
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(list));
+    safeStorage.setItem(PROGRESS_KEY, JSON.stringify(list));
     return list;
   } catch (e) {
     console.error('Error saving progress:', e);
@@ -122,17 +155,26 @@ export const removeProgress = (videoId) => {
   try {
     let list = getContinueWatching();
     list = list.filter((item) => (item.videoId || item.id) !== videoId);
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(list));
+    safeStorage.setItem(PROGRESS_KEY, JSON.stringify(list));
     return list;
   } catch (e) {
     return [];
   }
 };
 
+export const getProgress = (videoId) => {
+  try {
+    const list = getContinueWatching();
+    return list.find((item) => (item.videoId || item.id) === videoId) || null;
+  } catch (e) {
+    return null;
+  }
+};
+
 // Playback History
 export const getHistory = () => {
   try {
-    const saved = localStorage.getItem(HISTORY_KEY);
+    const saved = safeStorage.getItem(HISTORY_KEY);
     return saved ? JSON.parse(saved) : [];
   } catch (e) {
     return [];
@@ -152,7 +194,7 @@ export const addToHistory = (item) => {
       watchedAt: Date.now()
     });
     if (list.length > 50) list = list.slice(0, 50);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+    safeStorage.setItem(HISTORY_KEY, JSON.stringify(list));
   } catch (e) {
     console.error('Error adding to history:', e);
   }
@@ -174,10 +216,10 @@ export const exportBackup = () => {
 export const importBackup = (jsonString) => {
   try {
     const data = JSON.parse(jsonString);
-    if (data.settings) localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
-    if (data.favorites) localStorage.setItem(FAVORITES_KEY, JSON.stringify(data.favorites));
-    if (data.progress) localStorage.setItem(PROGRESS_KEY, JSON.stringify(data.progress));
-    if (data.history) localStorage.setItem(HISTORY_KEY, JSON.stringify(data.history));
+    if (data.settings) safeStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
+    if (data.favorites) safeStorage.setItem(FAVORITES_KEY, JSON.stringify(data.favorites));
+    if (data.progress) safeStorage.setItem(PROGRESS_KEY, JSON.stringify(data.progress));
+    if (data.history) safeStorage.setItem(HISTORY_KEY, JSON.stringify(data.history));
     return true;
   } catch (e) {
     console.error('Failed to import backup:', e);

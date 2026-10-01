@@ -8,11 +8,13 @@ import {
   Search, 
   X, 
   Settings, 
-  Radio,
-  Star
+  Star,
+  Command
 } from 'lucide-react';
 import { fetchCatalog } from '../services/cinemeta';
 import { getSettings } from '../services/storage';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 
 export const Navbar = ({ 
   currentTab, 
@@ -27,6 +29,19 @@ export const Navbar = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const searchTimeoutRef = useRef(null);
   const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  // Global Ctrl+K / Cmd+K listener to focus search
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   // Debounced search
   useEffect(() => {
@@ -45,7 +60,7 @@ export const Navbar = ({
           fetchCatalog('movie', null, searchQuery),
           fetchCatalog('series', null, searchQuery)
         ]);
-        const combined = [...(movies || []), ...(series || [])].slice(0, 10);
+        const combined = [...(movies || []), ...(series || [])].slice(0, 8);
         setSearchResults(combined);
         setShowDropdown(true);
       } catch (e) {
@@ -77,6 +92,18 @@ export const Navbar = ({
     onSelectMedia(item);
   };
 
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (searchResults.length > 0) {
+        e.preventDefault();
+        handleSelectResult(searchResults[0]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+      searchInputRef.current?.blur();
+    }
+  };
+
   const settings = getSettings();
   const hasCustomConfig = Boolean(settings.aiostreamConfigToken || settings.aiostreamUserData);
 
@@ -85,64 +112,86 @@ export const Navbar = ({
       {/* Brand */}
       <div className="brand-logo" onClick={() => onSelectTab('discover')}>
         <div className="brand-icon">
-          <Play size={20} fill="#fff" />
+          <Play size={16} fill="currentColor" />
         </div>
-        <div>
-          <span className="brand-text">STREMIX</span>
-          <span className="brand-tag" style={{ marginLeft: '8px' }}>AIO</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span className="brand-text">Stremix</span>
+          <Badge variant="outline" style={{ fontSize: '0.65rem', textTransform: 'uppercase', padding: '1px 6px' }}>
+            AIO
+          </Badge>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <nav className="nav-tabs">
+      {/* Navigation Tabs (shadcn style) */}
+      <div className="ui-tabs-list" style={{ height: '2.4rem' }}>
         <button 
-          className={`nav-tab-btn ${currentTab === 'discover' ? 'active' : ''}`}
+          className={`ui-tabs-trigger ${currentTab === 'discover' ? 'active' : ''}`}
           onClick={() => onSelectTab('discover')}
         >
-          <Compass size={17} />
+          <Compass size={15} />
           <span>Descubrir</span>
         </button>
         <button 
-          className={`nav-tab-btn ${currentTab === 'movies' ? 'active' : ''}`}
+          className={`ui-tabs-trigger ${currentTab === 'movies' ? 'active' : ''}`}
           onClick={() => onSelectTab('movies')}
         >
-          <Film size={17} />
+          <Film size={15} />
           <span>Películas</span>
         </button>
         <button 
-          className={`nav-tab-btn ${currentTab === 'series' ? 'active' : ''}`}
+          className={`ui-tabs-trigger ${currentTab === 'series' ? 'active' : ''}`}
           onClick={() => onSelectTab('series')}
         >
-          <Tv size={17} />
+          <Tv size={15} />
           <span>Series</span>
         </button>
         <button 
-          className={`nav-tab-btn ${currentTab === 'library' ? 'active' : ''}`}
+          className={`ui-tabs-trigger ${currentTab === 'library' ? 'active' : ''}`}
           onClick={() => onSelectTab('library')}
         >
-          <Bookmark size={17} />
+          <Bookmark size={15} />
           <span>Mi Biblioteca</span>
         </button>
-      </nav>
+      </div>
 
       {/* Search Input with Autocomplete */}
       <div className="search-wrapper" ref={dropdownRef}>
         <div className="search-input-container">
-          <Search size={18} color="var(--text-dim)" />
+          <Search size={15} color="hsl(var(--muted-foreground))" />
           <input
+            ref={searchInputRef}
             type="text"
             className="search-input"
-            placeholder="Buscar películas, series o anime..."
+            placeholder="Buscar títulos en AIOStreams..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             onFocus={() => {
               if (searchResults.length > 0) setShowDropdown(true);
             }}
           />
-          {searchQuery && (
-            <button className="search-clear-btn" onClick={() => setSearchQuery('')}>
-              <X size={16} />
+          {searchQuery ? (
+            <button 
+              className="ui-btn ui-btn-ghost ui-btn-icon search-clear-btn" 
+              style={{ width: '1.5rem', height: '1.5rem', padding: 0 }}
+              onClick={() => setSearchQuery('')}
+            >
+              <X size={14} />
             </button>
+          ) : (
+            <kbd style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+              fontSize: '0.7rem',
+              color: 'hsl(var(--muted-foreground))',
+              background: 'hsl(var(--muted))',
+              padding: '2px 5px',
+              borderRadius: '4px',
+              border: '1px solid hsl(var(--border))'
+            }}>
+              <Command size={10} /> K
+            </kbd>
           )}
         </div>
 
@@ -150,7 +199,7 @@ export const Navbar = ({
         {showDropdown && (
           <div className="search-dropdown">
             {isSearching ? (
-              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.9rem' }}>
+              <div style={{ padding: '12px', textAlign: 'center', color: 'hsl(var(--muted-foreground))', fontSize: '0.8125rem' }}>
                 Buscando títulos...
               </div>
             ) : searchResults.length > 0 ? (
@@ -180,7 +229,7 @@ export const Navbar = ({
                         <>
                           <span>•</span>
                           <span style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <Star size={12} fill="#fbbf24" /> {item.imdbRating}
+                            <Star size={11} fill="#fbbf24" /> {item.imdbRating}
                           </span>
                         </>
                       )}
@@ -189,7 +238,7 @@ export const Navbar = ({
                 </div>
               ))
             ) : (
-              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.9rem' }}>
+              <div style={{ padding: '12px', textAlign: 'center', color: 'hsl(var(--muted-foreground))', fontSize: '0.8125rem' }}>
                 No se encontraron resultados
               </div>
             )}
@@ -197,24 +246,37 @@ export const Navbar = ({
         )}
       </div>
 
-      {/* Actions & AIOStatus */}
-      <div className="header-actions">
-        <div 
+      {/* Actions & Status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button 
           className="status-pill"
           onClick={onOpenSettings}
-          title="Haz clic para configurar tu instancia de AIOStreams"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
         >
-          <span className={`status-dot ${hasCustomConfig ? 'online' : 'demo'}`}></span>
-          <span>{hasCustomConfig ? 'AIOStreams Conectado' : 'AIOStreams Demo'}</span>
-        </div>
-
-        <button 
-          className="icon-btn" 
-          onClick={onOpenSettings}
-          title="Ajustes y Addons"
-        >
-          <Settings size={19} />
+          <Badge 
+            variant={hasCustomConfig ? 'success' : 'secondary'} 
+            style={{ cursor: 'pointer', padding: '0.25rem 0.65rem' }}
+          >
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              backgroundColor: hasCustomConfig ? '#10b981' : '#f59e0b',
+              marginRight: '4px'
+            }}></span>
+            {hasCustomConfig ? 'AIOStreams Activo' : 'AIOStreams Demo'}
+          </Badge>
         </button>
+
+        <Button 
+          variant="outline" 
+          size="icon" 
+          className="settings-btn"
+          onClick={onOpenSettings}
+          title="Configuración de AIOStreams y Addons"
+        >
+          <Settings size={16} />
+        </Button>
       </div>
     </header>
   );

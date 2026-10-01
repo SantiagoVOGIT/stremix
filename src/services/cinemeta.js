@@ -43,6 +43,25 @@ export const GENRE_TRANSLATIONS = {
   'Western': 'Western'
 };
 
+const safeFetchJson = async (url) => {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    // If direct fails or times out, fall back to proxy
+  }
+  const proxied = `/api/proxy?url=${encodeURIComponent(url)}`;
+  const controller2 = new AbortController();
+  const timeout2 = setTimeout(() => controller2.abort(), 10000);
+  const res2 = await fetch(proxied, { signal: controller2.signal });
+  clearTimeout(timeout2);
+  if (!res2.ok) throw new Error(`HTTP error! status: ${res2.status}`);
+  return await res2.json();
+};
+
 /**
  * Fetch catalog items from Cinemeta
  * @param {('movie'|'series')} type
@@ -63,9 +82,7 @@ export const fetchCatalog = async (type = 'movie', genre = null, search = null, 
       url += skip > 0 ? `/skip=${skip}.json` : '.json';
     }
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const data = await res.json();
+    const data = await safeFetchJson(url);
     return data.metas || [];
   } catch (err) {
     console.error(`Error fetching catalog for ${type}:`, err);
@@ -82,9 +99,7 @@ export const fetchMeta = async (type, id) => {
   if (!id) return null;
   try {
     const url = `${CINEMETA_BASE}/meta/${type}/${id}.json`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const data = await res.json();
+    const data = await safeFetchJson(url);
     return data.meta || null;
   } catch (err) {
     console.error(`Error fetching metadata for ${type}/${id}:`, err);

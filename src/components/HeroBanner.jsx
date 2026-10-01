@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Info, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 
 export const HeroBanner = ({ items = [], onSelectMedia, onPlayMedia }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Auto-rotation every 8 seconds
   useEffect(() => {
     if (!items || items.length === 0 || isPaused) return;
     const interval = setInterval(() => {
@@ -18,7 +19,7 @@ export const HeroBanner = ({ items = [], onSelectMedia, onPlayMedia }) => {
 
   const current = items[currentIndex] || items[0];
   const backdrop = current.background || current.poster;
-  const rating = current.imdbRating || current.popularity?.toFixed(1) || '8.5';
+  const rating = current.imdbRating || current.popularity?.toFixed(1) || '8.2';
   const genres = current.genres || current.genre || [];
 
   const handlePrev = (e) => {
@@ -44,76 +45,89 @@ export const HeroBanner = ({ items = [], onSelectMedia, onPlayMedia }) => {
           alt={current.name} 
           className="hero-backdrop-img"
           key={current.id}
-          onError={(e) => {
-            e.target.style.display = 'none';
-          }}
+          onError={(e) => { e.target.style.display = 'none'; }}
         />
       )}
       <div className="hero-gradient-overlay"></div>
 
       {/* Main Content Info */}
       <div className="hero-content" key={`content-${current.id}`}>
-        <div className="hero-badge-group">
-          <span className="hero-type-badge">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <Badge variant="default" style={{ fontSize: '0.7rem' }}>
             {current.type === 'series' ? 'Serie Destacada' : 'Película Destacada'}
-          </span>
+          </Badge>
           {rating && (
-            <span className="hero-rating-badge">
-              <Star size={14} fill="#fbbf24" />
+            <Badge variant="secondary" style={{ color: '#fbbf24', borderColor: 'hsl(var(--border))' }}>
+              <Star size={12} fill="#fbbf24" />
               <span>{rating} IMDb</span>
-            </span>
+            </Badge>
           )}
-          <span className="hero-year-badge">
+          <span style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))' }}>
             {current.year || current.releaseInfo || '2024'}
           </span>
           {current.runtime && (
-            <span className="hero-year-badge">• {current.runtime}</span>
+            <span style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))' }}>
+              • {current.runtime}
+            </span>
           )}
         </div>
 
         <h1 className="hero-title">{current.name}</h1>
 
         {genres.length > 0 && (
-          <div className="hero-genres">
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {genres.slice(0, 4).map((g, i) => (
-              <span key={i} className="hero-genre-tag">{g}</span>
+              <Badge key={i} variant="outline" style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+                {g}
+              </Badge>
             ))}
           </div>
         )}
 
         <p className="hero-description">
-          {current.description || 'Disfruta de la mejor calidad de streaming con enlaces optimizados y filtrados por AIOStreams en Stremix.'}
+          {current.description || 'Explora y disfruta de la mejor calidad de streaming con enlaces optimizados por AIOStreams en Stremix.'}
         </p>
 
-        <div className="hero-btn-group">
-          <button 
-            className="btn-primary"
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '0.5rem' }}>
+          <Button 
+            variant="default"
+            size="lg"
             onClick={() => onPlayMedia ? onPlayMedia(current) : onSelectMedia(current)}
           >
-            <Play size={18} fill="#fff" />
-            <span>Reproducir Ahora</span>
-          </button>
-          <button 
-            className="btn-secondary"
+            <Play size={16} fill="currentColor" />
+            <span>Reproducir</span>
+          </Button>
+
+          <Button 
+            variant="secondary"
+            size="lg"
             onClick={() => onSelectMedia(current)}
           >
-            <Info size={18} />
-            <span>Ver Ficha y Enlaces</span>
-          </button>
+            <Info size={16} />
+            <span>Ficha & Enlaces</span>
+          </Button>
         </div>
       </div>
 
-      {/* Carousel Navigation Controls */}
-      <div className="hero-controls">
-        <button className="hero-nav-btn" onClick={handlePrev} title="Anterior">
-          <ChevronLeft size={20} />
-        </button>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', padding: '0 4px' }}>
+      {/* Carousel Controls */}
+      <div style={{
+        position: 'absolute',
+        bottom: '2rem',
+        right: '3.5rem',
+        zIndex: 5,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}>
+        <Button variant="outline" size="icon" onClick={handlePrev} title="Anterior">
+          <ChevronLeft size={16} />
+        </Button>
+        <span style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))', padding: '0 4px', fontFamily: 'var(--font-mono)' }}>
           {currentIndex + 1} / {items.length}
         </span>
-        <button className="hero-nav-btn" onClick={handleNext} title="Siguiente">
-          <ChevronRight size={20} />
-        </button>
+        <Button variant="outline" size="icon" onClick={handleNext} title="Siguiente">
+          <ChevronRight size={16} />
+        </Button>
       </div>
     </div>
   );

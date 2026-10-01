@@ -7,10 +7,12 @@ import { MediaModal } from './components/MediaModal';
 import { VideoPlayer } from './components/VideoPlayer';
 import { LibraryView } from './components/LibraryView';
 import { AioSettingsModal } from './components/AioSettingsModal';
-import { fetchCatalog } from './services/cinemeta';
+import { fetchCatalog, fetchMeta } from './services/cinemeta';
 import { fetchAioStreams } from './services/aiostream';
 import { getSettings } from './services/storage';
-import { RefreshCw, Film, Tv, Sparkles, AlertCircle } from 'lucide-react';
+import { Button } from './components/ui/button';
+import { Badge } from './components/ui/badge';
+import { RefreshCw, Film, Tv, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('discover');
@@ -128,42 +130,93 @@ export default function App() {
     }
   };
 
-  // Launch Video Player from stream click
-  const handlePlayStream = (stream, mediaItem, episode = null, availableStreams = []) => {
+  // Launch Video Player from stream click with full stream options & episode list
+  const handlePlayStream = (stream, mediaItem, episode = null, availableStreams = [], allEpisodes = []) => {
     setPlayerState({
       stream,
       mediaItem,
       episode,
-      availableStreams: availableStreams.length > 0 ? availableStreams : [stream]
+      availableStreams: availableStreams.length > 0 ? availableStreams : [stream],
+      allEpisodes: allEpisodes || []
     });
   };
 
   // Quick Play directly from card or hero (auto-fetches top AIOStream)
   const handleQuickPlay = async (mediaItem) => {
     try {
-      const result = await fetchAioStreams(mediaItem.type || 'movie', mediaItem.id, mediaItem);
-      if (result.streams && result.streams.length > 0) {
-        handlePlayStream(result.streams[0], mediaItem, null, result.streams);
+      if (mediaItem.type === 'series') {
+        const meta = await fetchMeta('series', mediaItem.id);
+        const ep = mediaItem.currentEpisode || mediaItem.episode || (meta?.videos && meta.videos[0]) || { season: 1, number: 1, id: `${mediaItem.id}:1:1`, name: 'Episodio 1' };
+        const epId = ep.id || `${mediaItem.id}:${ep.season}:${ep.number || ep.episode || 1}`;
+        const result = await fetchAioStreams('series', epId, { ...mediaItem, ...meta });
+        if (result.streams && result.streams.length > 0) {
+          handlePlayStream(result.streams[0], { ...mediaItem, ...meta }, ep, result.streams, meta?.videos || []);
+          return;
+        }
       } else {
-        setSelectedMedia(mediaItem);
+        const result = await fetchAioStreams('movie', mediaItem.id, mediaItem);
+        if (result.streams && result.streams.length > 0) {
+          handlePlayStream(result.streams[0], mediaItem, null, result.streams, []);
+          return;
+        }
       }
+      setSelectedMedia(mediaItem);
     } catch (e) {
       setSelectedMedia(mediaItem);
+    }
+  };
+
+  // Play specific episode in series
+  const handlePlayEpisode = async (mediaItem, targetEpisode, currentAllEpisodes = []) => {
+    try {
+      const epId = targetEpisode.id || `${mediaItem.id}:${targetEpisode.season}:${targetEpisode.number || targetEpisode.episode}`;
+      const result = await fetchAioStreams('series', epId, mediaItem);
+      if (result.streams && result.streams.length > 0) {
+        handlePlayStream(
+          result.streams[0], 
+          mediaItem, 
+          targetEpisode, 
+          result.streams, 
+          currentAllEpisodes.length > 0 ? currentAllEpisodes : (playerState?.allEpisodes || [])
+        );
+      } else {
+        setSelectedMedia({
+          ...mediaItem,
+          episode: targetEpisode
+        });
+      }
+    } catch (e) {
+      console.error('Error playing episode:', e);
     }
   };
 
   // Resume playback from library item
   const handleResumePlayback = async (progressItem) => {
     try {
+      const isSeries = progressItem.type === 'series';
+      let meta = null;
+      if (isSeries) {
+        meta = await fetchMeta('series', progressItem.id);
+      }
+      const targetId = isSeries
+        ? (progressItem.videoId || (progressItem.episode ? `${progressItem.id}:${progressItem.episode.season}:${progressItem.episode.number || progressItem.episode.episode}` : progressItem.id))
+        : progressItem.id;
+
       const result = await fetchAioStreams(
         progressItem.type || 'movie', 
-        progressItem.videoId || progressItem.id, 
+        targetId, 
         progressItem
       );
       if (result.streams && result.streams.length > 0) {
-        handlePlayStream(result.streams[0], progressItem, progressItem.episode, result.streams);
+        handlePlayStream(
+          result.streams[0], 
+          meta ? { ...progressItem, ...meta } : progressItem, 
+          progressItem.episode, 
+          result.streams,
+          meta?.videos || []
+        );
       } else {
-        setSelectedMedia(progressItem);
+        setSelectedMedia(meta ? { ...progressItem, ...meta } : progressItem);
       }
     } catch (e) {
       setSelectedMedia(progressItem);
@@ -224,22 +277,22 @@ export default function App() {
                   {currentTab === 'movies' ? 'Películas Populares' : currentTab === 'series' ? 'Series de Televisión' : 'Explorar Catálogo AIO'}
                 </h2>
                 {selectedGenre && (
-                  <span className="section-count-badge">
+                  <Badge variant="secondary" style={{ fontSize: '0.75rem' }}>
                     Género: {selectedGenre}
-                  </span>
+                  </Badge>
                 )}
               </div>
 
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
+              <span style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))' }}>
                 {catalogItems.length} títulos disponibles
               </span>
             </div>
 
             {/* Media Grid */}
             {loading ? (
-              <div style={{ padding: '80px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <RefreshCw size={36} className="spin" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-                <p>Cargando catálogo cinematográfico...</p>
+              <div style={{ padding: '80px', textAlign: 'center', color: 'hsl(var(--muted-foreground))' }}>
+                <RefreshCw size={32} className="spin" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+                <p style={{ fontSize: '0.875rem' }}>Cargando catálogo cinematográfico...</p>
               </div>
             ) : catalogItems.length > 0 ? (
               <>
@@ -255,28 +308,28 @@ export default function App() {
                 </div>
 
                 {/* Load More Button */}
-                <div style={{ textAlign: 'center', marginTop: '40px' }}>
-                  <button 
-                    className="btn-secondary" 
+                <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+                  <Button 
+                    variant="outline" 
                     onClick={handleLoadMore}
                     disabled={loadingMore}
                     style={{ margin: '0 auto' }}
                   >
                     {loadingMore ? (
                       <>
-                        <RefreshCw size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                        <RefreshCw size={14} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
                         <span>Cargando más...</span>
                       </>
                     ) : (
                       <span>Cargar Más Títulos</span>
                     )}
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
-              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-dim)' }}>
-                <Film size={48} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
-                <p>No se encontraron títulos en esta categoría.</p>
+              <div style={{ padding: '60px', textAlign: 'center', color: 'hsl(var(--muted-foreground))' }}>
+                <Film size={40} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                <p style={{ fontSize: '0.875rem' }}>No se encontraron títulos en esta categoría.</p>
               </div>
             )}
           </section>
@@ -288,9 +341,13 @@ export default function App() {
         <MediaModal
           mediaItem={selectedMedia}
           onClose={() => setSelectedMedia(null)}
-          onPlayStream={(stream, mediaItem, episode) => {
+          onOpenSettings={() => {
             setSelectedMedia(null);
-            handlePlayStream(stream, mediaItem, episode);
+            setShowSettings(true);
+          }}
+          onPlayStream={(stream, mediaItem, episode, availableStreams, allEpisodes) => {
+            setSelectedMedia(null);
+            handlePlayStream(stream, mediaItem, episode, availableStreams, allEpisodes);
           }}
         />
       )}
@@ -301,24 +358,37 @@ export default function App() {
           stream={playerState.stream}
           mediaItem={playerState.mediaItem}
           episode={playerState.episode}
+          allEpisodes={playerState.allEpisodes || []}
           availableStreams={playerState.availableStreams}
           onClose={() => setPlayerState(null)}
           onSwitchStream={handleSwitchStream}
-          onNextEpisode={() => {
-            // Next episode logic
+          onSelectEpisode={(ep) => handlePlayEpisode(playerState.mediaItem, ep, playerState.allEpisodes)}
+          onNextEpisode={(nextEp) => {
+            const validNextEp = (nextEp && typeof nextEp === 'object' && !('nativeEvent' in nextEp) && ('season' in nextEp || 'id' in nextEp)) ? nextEp : null;
+            if (validNextEp) {
+              handlePlayEpisode(playerState.mediaItem, validNextEp, playerState.allEpisodes);
+              return;
+            }
+            if (playerState.allEpisodes && playerState.allEpisodes.length > 0 && playerState.episode) {
+              const currentIdx = playerState.allEpisodes.findIndex(e => 
+                e.id === playerState.episode.id || 
+                (e.season === playerState.episode.season && (e.number || e.episode) === (playerState.episode.number || playerState.episode.episode))
+              );
+              if (currentIdx >= 0 && currentIdx < playerState.allEpisodes.length - 1) {
+                handlePlayEpisode(playerState.mediaItem, playerState.allEpisodes[currentIdx + 1], playerState.allEpisodes);
+                return;
+              }
+            }
             if (playerState.episode) {
               const currentNum = playerState.episode.number || playerState.episode.episode || 1;
-              const nextEpisode = {
+              const fallbackNext = {
                 ...playerState.episode,
                 number: currentNum + 1,
                 episode: currentNum + 1,
                 name: `Episodio ${currentNum + 1}`,
                 id: `${playerState.mediaItem.id}:${playerState.episode.season}:${currentNum + 1}`
               };
-              handleQuickPlay({
-                ...playerState.mediaItem,
-                currentEpisode: nextEpisode
-              });
+              handlePlayEpisode(playerState.mediaItem, fallbackNext, playerState.allEpisodes);
             }
           }}
         />

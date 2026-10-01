@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  X, 
-  Check, 
   Server, 
   Key, 
   Zap, 
-  Sliders, 
   ExternalLink, 
   RefreshCw, 
   AlertCircle,
   HelpCircle,
   ShieldCheck,
-  Film
+  Check
 } from 'lucide-react';
 import { 
   getSettings, 
@@ -19,23 +16,19 @@ import {
 } from '../services/storage';
 import { 
   PUBLIC_AIO_INSTANCES, 
-  testAioConnection 
+  testAioConnection,
+  normalizeAioUrl
 } from '../services/aiostream';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Input } from './ui/input';
 
 export const AioSettingsModal = ({ onClose, onSettingsUpdated }) => {
   const [settings, setSettings] = useState(getSettings());
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   const handleTestConnection = async () => {
     setTesting(true);
@@ -55,54 +48,55 @@ export const AioSettingsModal = ({ onClose, onSettingsUpdated }) => {
   };
 
   const handleSave = () => {
-    saveSettings(settings);
+    // If the token is a full URL, auto-sync aiostreamUrl to its origin
+    const normalized = normalizeAioUrl(settings.aiostreamConfigToken, settings.aiostreamUrl);
+    const updatedSettings = {
+      ...settings,
+      aiostreamUrl: normalized?.origin || settings.aiostreamUrl
+    };
+
+    saveSettings(updatedSettings);
     setSavedSuccess(true);
-    if (onSettingsUpdated) onSettingsUpdated(settings);
+    if (onSettingsUpdated) onSettingsUpdated(updatedSettings);
     setTimeout(() => {
       setSavedSuccess(false);
       onClose();
-    }, 1200);
+    }, 1000);
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-sheet" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close-btn" onClick={onClose}>
-          <X size={20} />
-        </button>
-
-        <div style={{ padding: '28px 32px', borderBottom: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="brand-icon" style={{ width: '42px', height: '42px' }}>
-              <Server size={22} fill="#fff" />
+    <Dialog open={true} onClose={onClose}>
+      <DialogContent onClose={onClose} style={{ maxWidth: '42rem', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem' }}>
+        <DialogHeader style={{ padding: 0, paddingBottom: '1rem', borderBottom: '1px solid hsl(var(--border))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="brand-icon">
+              <Server size={18} fill="currentColor" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff' }}>
-                Configuración de AIOStreams
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Personaliza la API de AIOStreams, tus servicios Debrid (Real-Debrid, Torbox) y opciones de reproducción.
-              </p>
+              <DialogTitle>Configuración de AIOStreams</DialogTitle>
+              <DialogDescription>
+                Conecta tu instancia de AIOStreams, manifiesto personalizado o cuentas Debrid.
+              </DialogDescription>
             </div>
           </div>
-        </div>
+        </DialogHeader>
 
-        <div className="modal-body" style={{ padding: '28px 32px' }}>
-          {/* Quick Guide Alert */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.25rem' }}>
+          {/* Quick Info Box */}
           <div style={{
-            background: 'rgba(139, 92, 246, 0.08)',
-            border: '1px solid rgba(139, 92, 246, 0.25)',
-            borderRadius: '12px',
-            padding: '14px 18px',
+            backgroundColor: 'hsl(var(--muted) / 0.5)',
+            border: '1px solid hsl(var(--border))',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.875rem 1rem',
             display: 'flex',
             alignItems: 'flex-start',
-            gap: '12px'
+            gap: '10px'
           }}>
-            <HelpCircle size={22} color="var(--accent-violet)" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5 }}>
-              <strong>¿Cómo funciona AIOStreams?</strong>
-              <p style={{ marginTop: '4px' }}>
-                AIOStreams consolida Torrentio, MediaFusion, Debrid y Usenet en un único super-feed. Puedes usar la versión de prueba incluida o conectar tu propia configuración de AIOStreams pegando tu Token o enlace de manifiesto a continuación.
+            <HelpCircle size={18} color="hsl(var(--muted-foreground))" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))', lineHeight: 1.5 }}>
+              <strong style={{ color: 'hsl(var(--foreground))' }}>¿Tienes un enlace de manifiesto o token?</strong>
+              <p style={{ marginTop: '2px' }}>
+                Pega a continuación tu enlace (soporta enlaces de Stremio <code>stremio://...</code> o <code>https://.../manifest.json</code>). Stremix normalizará la conexión automáticamente.
               </p>
               <a 
                 href="https://aiostreams.viren070.me/stremio/configure" 
@@ -111,37 +105,44 @@ export const AioSettingsModal = ({ onClose, onSettingsUpdated }) => {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
-                  color: 'var(--accent-cyan)',
-                  marginTop: '8px',
+                  gap: '4px',
+                  color: 'hsl(var(--foreground))',
+                  marginTop: '6px',
                   fontWeight: 600,
-                  textDecoration: 'none'
+                  textDecoration: 'underline',
+                  fontSize: '0.775rem'
                 }}
               >
-                Abrir portal de configuración de AIOStreams <ExternalLink size={13} />
+                Abrir portal de configuración de AIOStreams <ExternalLink size={11} />
               </a>
             </div>
           </div>
 
-          {/* Instance Selection */}
-          <div className="form-group">
-            <label className="form-label">
-              <span>Instancia de AIOStreams</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)' }}>Selecciona una o escribe tu URL</span>
+          {/* Preset Instances Grid */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+              Instancia de AIOStreams
             </label>
-            <div className="instance-cards-grid">
+            <div className="instance-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
               {PUBLIC_AIO_INSTANCES.map((inst) => {
                 const isSelected = settings.aiostreamUrl === inst.url;
                 return (
                   <div
                     key={inst.url}
-                    className={`instance-card-select ${isSelected ? 'selected' : ''}`}
                     onClick={() => setSettings({ ...settings, aiostreamUrl: inst.url })}
+                    style={{
+                      padding: '0.625rem 0.75rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: `1px solid ${isSelected ? 'hsl(var(--primary))' : 'hsl(var(--border))'}`,
+                      backgroundColor: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--card))',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: isSelected ? '#fff' : 'var(--text-main)' }}>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
                       {inst.name}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', marginTop: '2px' }}>
                       {inst.desc}
                     </div>
                   </div>
@@ -149,95 +150,78 @@ export const AioSettingsModal = ({ onClose, onSettingsUpdated }) => {
               })}
             </div>
 
-            <input
-              type="text"
-              className="form-input"
-              style={{ marginTop: '8px' }}
+            <Input
+              style={{ marginTop: '4px' }}
               value={settings.aiostreamUrl}
               onChange={(e) => setSettings({ ...settings, aiostreamUrl: e.target.value })}
               placeholder="https://aiostreams.viren070.me"
             />
           </div>
 
-          {/* Manifest URL or Config Token */}
-          <div className="form-group">
-            <label className="form-label">
+          {/* Config Token or Manifest URL */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))', display: 'flex', justifyContent: 'space-between' }}>
               <span>Token de Configuración o Enlace Manifest</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Opcional (para tu Real-Debrid)</span>
+              <span style={{ fontSize: '0.72rem', color: 'hsl(var(--muted-foreground))' }}>Soporta stremio:// y https://</span>
             </label>
-            <input
-              type="text"
-              className="form-input"
+            <Input
+              className="aio-token-input"
               value={settings.aiostreamConfigToken}
               onChange={(e) => setSettings({ ...settings, aiostreamConfigToken: e.target.value })}
               placeholder="Ej: https://aiostreams.viren070.me/stremio/u/tu-alias/manifest.json o tu token"
             />
-            <span className="form-hint">
-              Pega aquí el enlace de manifiesto que genera AIOStreams tras guardar tus addons y claves Debrid.
+            <span style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+              Pega aquí el enlace de manifiesto generado por tu instancia de AIOStreams tras guardar tus claves Debrid.
             </span>
           </div>
 
-          {/* REST API User Data (Advanced) */}
-          <div className="form-group">
-            <label className="form-label">
-              <span>UserData REST API (Avanzado)</span>
-            </label>
-            <input
-              type="text"
-              className="form-input"
-              value={settings.aiostreamUserData}
-              onChange={(e) => setSettings({ ...settings, aiostreamUserData: e.target.value })}
-              placeholder="UserData JSON en Base64 para llamadas directas a /api/v1/search"
-            />
-          </div>
-
-          {/* Test Connection Diagnostic Box */}
+          {/* Live Test Diagnostic Box */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid var(--border-glass)',
-            borderRadius: '12px',
-            padding: '16px',
+            backgroundColor: 'hsl(var(--muted) / 0.3)',
+            border: '1px solid hsl(var(--border))',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.875rem 1rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '10px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={18} color="var(--accent-amber)" />
-                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Zap size={15} color="#fbbf24" />
+                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
                   Diagnóstico de Conexión
                 </span>
               </div>
-              <button 
-                className="btn-secondary" 
-                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+              <Button 
+                variant="secondary" 
+                size="sm" 
                 onClick={handleTestConnection}
                 disabled={testing}
               >
-                {testing ? <RefreshCw size={14} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> : 'Probar Conexión'}
-              </button>
+                {testing ? <RefreshCw size={13} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> : 'Probar Conexión'}
+              </Button>
             </div>
 
             {testResult && (
               <div style={{
-                background: testResult.ok ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                border: `1px solid ${testResult.ok ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                borderRadius: '8px',
-                padding: '12px 14px',
-                fontSize: '0.85rem'
+                backgroundColor: testResult.ok ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                border: `1px solid ${testResult.ok ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.625rem 0.75rem',
+                fontSize: '0.8125rem'
               }}>
                 {testResult.ok ? (
                   <div>
-                    <div style={{ color: 'var(--accent-emerald)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Check size={16} /> Conexión Exitosa ({testResult.latency} ms)
+                    <div style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Check size={15} /> Conexión Exitosa ({testResult.latency} ms)
                     </div>
-                    <div style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div style={{ color: 'hsl(var(--muted-foreground))', marginTop: '2px', fontSize: '0.75rem' }}>
                       Addon: <strong>{testResult.name}</strong> • Versión: <strong>{testResult.version}</strong>
                     </div>
                   </div>
                 ) : (
                   <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <AlertCircle size={16} /> Error: {testResult.error}
+                    <AlertCircle size={15} /> Error: {testResult.error}
                   </div>
                 )}
               </div>
@@ -245,52 +229,109 @@ export const AioSettingsModal = ({ onClose, onSettingsUpdated }) => {
           </div>
 
           {/* Preferences Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <div className="form-group">
-              <label className="form-label">Calidad Preferida</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                Calidad Preferida
+              </label>
               <select
-                className="form-input"
-                value={settings.preferredResolution}
+                className="ui-input"
+                value={settings.preferredResolution || 'all'}
                 onChange={(e) => setSettings({ ...settings, preferredResolution: e.target.value })}
               >
-                <option value="all">Todas las calidades</option>
-                <option value="4k">4K UHD (2160p)</option>
-                <option value="1080p">1080p Full HD</option>
-                <option value="720p">720p HD</option>
+                <option value="all" style={{ background: '#09090b' }}>Todas las calidades</option>
+                <option value="4k" style={{ background: '#09090b' }}>4K UHD (2160p)</option>
+                <option value="1080p" style={{ background: '#09090b' }}>1080p Full HD</option>
+                <option value="720p" style={{ background: '#09090b' }}>720p HD</option>
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Ordenar Resultados Por</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                Criterio de Ordenamiento de Enlaces
+              </label>
               <select
-                className="form-input"
-                value={settings.sortBy}
+                className="ui-input"
+                value={settings.sortBy || 'quality'}
                 onChange={(e) => setSettings({ ...settings, sortBy: e.target.value })}
               >
-                <option value="quality">Mejor Calidad (Bitrate/4K)</option>
-                <option value="seeders">Más Semillas (P2P)</option>
-                <option value="size">Tamaño de Archivo</option>
+                <option value="quality" style={{ background: '#09090b' }}>Mayor Calidad (4K &gt; 1080p)</option>
+                <option value="spanish" style={{ background: '#09090b' }}>🇲🇽 / 🇪🇸 Audio Español Primero</option>
+                <option value="seeders" style={{ background: '#09090b' }}>Más Semillas (P2P)</option>
+                <option value="size" style={{ background: '#09090b' }}>Mayor Tamaño de Archivo</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                Idioma Predeterminado de Subtítulos
+              </label>
+              <select
+                className="ui-input"
+                value={settings.subtitlesLanguage || 'spa'}
+                onChange={(e) => setSettings({ ...settings, subtitlesLanguage: e.target.value })}
+              >
+                <option value="spa" style={{ background: '#09090b' }}>Español (Latino / Castellano)</option>
+                <option value="eng" style={{ background: '#09090b' }}>Inglés (English)</option>
+                <option value="all" style={{ background: '#09090b' }}>Todos los idiomas</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                Reproductor Externo
+              </label>
+              <select
+                className="ui-input"
+                value={settings.externalPlayer || 'vlc'}
+                onChange={(e) => setSettings({ ...settings, externalPlayer: e.target.value })}
+              >
+                <option value="vlc" style={{ background: '#09090b' }}>VLC Media Player</option>
+                <option value="mpv" style={{ background: '#09090b' }}>MPV Player</option>
+                <option value="potplayer" style={{ background: '#09090b' }}>PotPlayer</option>
               </select>
             </div>
           </div>
 
-          {/* Save / Cancel Footer */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
-            <button className="btn-secondary" onClick={onClose}>
-              Cancelar
-            </button>
-            <button className="btn-primary" onClick={handleSave}>
-              {savedSuccess ? (
-                <>
-                  <Check size={18} /> ¡Guardado!
-                </>
-              ) : (
-                'Guardar Ajustes'
-              )}
-            </button>
+          {/* Toggle Switches */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '4px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.8125rem', color: 'hsl(var(--foreground))' }}>
+              <input
+                type="checkbox"
+                checked={settings.autoPlayNext !== false}
+                onChange={(e) => setSettings({ ...settings, autoPlayNext: e.target.checked })}
+                style={{ accentColor: 'hsl(var(--primary))', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span><strong>Auto-Binge:</strong> Reproducir automáticamente el siguiente episodio en series</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.8125rem', color: 'hsl(var(--foreground))' }}>
+              <input
+                type="checkbox"
+                checked={settings.useProxy !== false}
+                onChange={(e) => setSettings({ ...settings, useProxy: e.target.checked })}
+                style={{ accentColor: 'hsl(var(--primary))', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span><strong>Proxy Anti-CORS:</strong> Habilitar streaming proxy con soporte de rangos HTTP 206 (Recomendado)</span>
+            </label>
           </div>
         </div>
-      </div>
-    </div>
+
+        <DialogFooter style={{ padding: 0, paddingTop: '1.25rem', marginTop: '1.25rem' }}>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="default" onClick={handleSave}>
+            {savedSuccess ? (
+              <>
+                <Check size={15} /> ¡Guardado!
+              </>
+            ) : (
+              'Guardar Configuración'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

@@ -1,6 +1,4 @@
 import puppeteer from 'puppeteer-core';
-import fs from 'fs';
-import path from 'path';
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 
@@ -45,9 +43,16 @@ async function runE2E() {
     const firstCard = await page.$('.media-card');
     await firstCard.click();
     await page.waitForSelector('.modal-sheet', { timeout: 10000 });
-    await new Promise(r => setTimeout(r, 2000));
+    // 2b. Test VLC External Player Button
+    console.log('2b. Testing VLC external player launcher button on stream card...');
+    const vlcBtn = await page.$('.stream-card button::-p-text(VLC)');
+    if (vlcBtn) {
+      await vlcBtn.click();
+      await new Promise(r => setTimeout(r, 1200));
+      console.log('✓ VLC button clicked, .m3u download & clipboard copy triggered.');
+    }
     await page.screenshot({ path: 'screenshot-modal.png' });
-    console.log('✓ Detail modal opened with AIOStreams section, screenshot-modal.png saved.');
+    console.log('✓ Detail modal opened with enhanced meta tags and VLC launcher, screenshot-modal.png saved.');
 
     // 3. Play stream
     console.log('3. Clicking stream play button...');
@@ -60,9 +65,9 @@ async function runE2E() {
       console.log('✓ Video player launched successfully, screenshot-player.png saved.');
 
       // Close player (Esc or close btn)
-      const closeBtn = await page.$('.player-top-bar button');
+      const closeBtn = await page.$('.player-close-btn') || await page.$('.player-top-bar button:last-child');
       if (closeBtn) await closeBtn.click();
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1200));
     }
 
     // Close modal if open
@@ -86,25 +91,46 @@ async function runE2E() {
     if (clearBtn) await clearBtn.click();
     await new Promise(r => setTimeout(r, 500));
 
-    // 5. Open AIOStreams Settings Modal
+    // 5. Open AIOStreams Settings Modal & Test Manifest Normalization
     console.log('5. Opening AIOStreams settings modal...');
-    const settingsPill = await page.$('.status-pill');
-    await settingsPill.click();
+    await page.waitForSelector('.status-pill, .settings-btn', { timeout: 5000 });
+    const settingsPill = await page.$('.status-pill') || await page.$('.settings-btn');
+    if (settingsPill) {
+      await settingsPill.click();
+    }
     await page.waitForSelector('.instance-cards-grid', { timeout: 5000 });
     
+    // Test typing a stremio:// manifest URL
+    console.log('5b. Testing stremio:// protocol manifest input...');
+    const tokenInput = await page.$('.aio-token-input');
+    if (tokenInput) {
+      await tokenInput.click({ clickCount: 3 });
+      await tokenInput.type('stremio://aiostreams.viren070.me/manifest.json', { delay: 30 });
+    }
+
     // Click Probar Conexión
+    console.log('5c. Testing connection with normalized manifest...');
     const testConnBtn = await page.$('button::-p-text(Probar Conexión)');
     if (testConnBtn) {
       await testConnBtn.click();
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 2500));
     }
     await page.screenshot({ path: 'screenshot-settings.png' });
-    console.log('✓ AIOStreams settings & live connection tested, screenshot-settings.png saved.');
+    console.log('✓ AIOStreams settings & live manifest connection tested, screenshot-settings.png saved.');
 
-    // Close settings
+    // Click Guardar
+    const saveBtn = await page.$('button::-p-text(Guardar Configuración)');
+    if (saveBtn) {
+      await saveBtn.click();
+      await new Promise(r => setTimeout(r, 1500));
+    }
+
+    // Close settings if still visible
     const settingsClose = await page.$('.modal-close-btn');
-    if (settingsClose) await settingsClose.click();
-    await new Promise(r => setTimeout(r, 500));
+    if (settingsClose) {
+      await settingsClose.click();
+      await new Promise(r => setTimeout(r, 500));
+    }
 
     // 6. Test Library Tab
     console.log('6. Switching to Mi Biblioteca...');

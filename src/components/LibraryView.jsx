@@ -6,11 +6,7 @@ import {
   Clock, 
   Download, 
   Upload, 
-  Check, 
-  Film, 
-  Tv, 
-  Sparkles,
-  ExternalLink 
+  Sparkles
 } from 'lucide-react';
 import { 
   getContinueWatching, 
@@ -20,9 +16,11 @@ import {
   exportBackup,
   importBackup
 } from '../services/storage';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
+import { Button } from './ui/button';
 
 export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
-  const [activeTab, setActiveTab] = useState('continue'); // 'continue', 'favorites', 'history'
+  const [activeTab, setActiveTab] = useState('continue');
   const [continueList, setContinueList] = useState([]);
   const [favoritesList, setFavoritesList] = useState([]);
   const [historyList, setHistoryList] = useState([]);
@@ -80,45 +78,42 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
   };
 
   return (
-    <div className="section-wrapper" style={{ marginTop: '20px' }}>
-      {/* Sub-nav Tabs */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '14px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button 
-            className={`nav-tab-btn ${activeTab === 'continue' ? 'active' : ''}`}
-            onClick={() => setActiveTab('continue')}
-          >
-            <Clock size={16} />
-            <span>Continuar Viendo ({continueList.length})</span>
-          </button>
-          <button 
-            className={`nav-tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
-            onClick={() => setActiveTab('favorites')}
-          >
-            <Bookmark size={16} />
-            <span>Favoritos ({favoritesList.length})</span>
-          </button>
-          <button 
-            className={`nav-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            <Sparkles size={16} />
-            <span>Historial</span>
-          </button>
-        </div>
+    <div className="section-wrapper" style={{ marginTop: '1.5rem' }}>
+      {/* Header Row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} style={{ width: 'auto' }}>
+          <TabsList>
+            <TabsTrigger value="continue">
+              <Clock size={14} />
+              <span>Continuar Viendo ({continueList.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="favorites">
+              <Bookmark size={14} />
+              <span>Favoritos ({favoritesList.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <Sparkles size={14} />
+              <span>Historial</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Backup Actions */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {importStatus && (
-            <span style={{ fontSize: '0.85rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>
               {importStatus}
             </span>
           )}
-          <button className="icon-btn" onClick={handleExport} title="Exportar copia de seguridad (JSON)">
-            <Download size={18} />
-          </button>
-          <label className="icon-btn" title="Importar copia de seguridad (JSON)" style={{ cursor: 'pointer' }}>
-            <Upload size={18} />
+          <Button variant="outline" size="sm" onClick={handleExport} title="Exportar copia de seguridad (JSON)">
+            <Download size={14} />
+            <span>Exportar</span>
+          </Button>
+          <label style={{ display: 'inline-flex', cursor: 'pointer' }}>
+            <Button variant="outline" size="sm" as="span" title="Importar copia de seguridad (JSON)">
+              <Upload size={14} />
+              <span>Importar</span>
+            </Button>
             <input type="file" accept=".json" onChange={handleImportFile} style={{ display: 'none' }} />
           </label>
         </div>
@@ -128,10 +123,12 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
       {activeTab === 'continue' && (
         <div>
           {continueList.length === 0 ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Clock size={48} color="var(--text-dim)" style={{ margin: '0 auto 16px' }} />
-              <h3>No tienes reproducciones pendientes</h3>
-              <p style={{ marginTop: '6px', fontSize: '0.9rem', color: 'var(--text-dim)' }}>
+            <div style={{ padding: '4rem 1rem', textAlign: 'center', color: 'hsl(var(--muted-foreground))' }}>
+              <Clock size={40} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                No tienes reproducciones pendientes
+              </h3>
+              <p style={{ marginTop: '4px', fontSize: '0.85rem' }}>
                 Cuando comiences a ver cualquier película o serie, tu progreso se guardará aquí automáticamente.
               </p>
             </div>
@@ -156,37 +153,41 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      height: '6px',
-                      background: 'rgba(0,0,0,0.6)',
+                      height: '4px',
+                      backgroundColor: 'rgba(0,0,0,0.6)',
                       zIndex: 3
                     }}>
                       <div style={{
                         height: '100%',
-                        width: `${Math.min(100, Math.max(5, item.percentage || 0))}%`,
-                        background: 'var(--gradient-brand)'
+                        width: `${Math.min(100, Math.max(5, isNaN(item.percentage) ? (item.duration > 0 ? (item.currentTime / item.duration) * 100 : 5) : item.percentage))}%`,
+                        backgroundColor: 'hsl(var(--primary))'
                       }}></div>
                     </div>
 
                     <div className="card-overlay">
-                      <div className="card-quick-actions">
-                        <button 
-                          className="quick-play-btn"
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <Button 
+                          variant="default"
+                          size="sm"
+                          style={{ flex: 1, fontSize: '0.8rem' }}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onResumePlayback) onResumePlayback(item);
                             else onSelectMedia(item);
                           }}
                         >
-                          <Play size={15} fill="#fff" />
+                          <Play size={13} fill="currentColor" />
                           <span>Reanudar</span>
-                        </button>
-                        <button 
-                          className="quick-fav-btn" 
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="icon"
+                          style={{ width: '1.85rem', height: '1.85rem' }}
                           onClick={(e) => handleRemoveProgress(e, item.videoId || item.id)}
-                          title="Quitar de continuar viendo"
+                          title="Quitar"
                         >
-                          <Trash2 size={15} />
-                        </button>
+                          <Trash2 size={13} />
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -194,8 +195,8 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
                   <div className="card-info">
                     <h3 className="card-title">{item.name}</h3>
                     <div className="card-meta-row">
-                      <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>
-                        {item.episode ? `T${item.episode.season}:E${item.episode.number}` : 'Película'}
+                      <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>
+                        {item.episode ? `T${item.episode.season}:E${item.episode.number || item.episode.episode || 1}` : 'Película'}
                       </span>
                       <span>
                         {formatSecs(item.currentTime)} / {formatSecs(item.duration)}
@@ -213,10 +214,12 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
       {activeTab === 'favorites' && (
         <div>
           {favoritesList.length === 0 ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Bookmark size={48} color="var(--text-dim)" style={{ margin: '0 auto 16px' }} />
-              <h3>Tu lista de favoritos está vacía</h3>
-              <p style={{ marginTop: '6px', fontSize: '0.9rem', color: 'var(--text-dim)' }}>
+            <div style={{ padding: '4rem 1rem', textAlign: 'center', color: 'hsl(var(--muted-foreground))' }}>
+              <Bookmark size={40} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                Tu lista de favoritos está vacía
+              </h3>
+              <p style={{ marginTop: '4px', fontSize: '0.85rem' }}>
                 Agrega películas o series presionando el icono del marcador en cualquier tarjeta.
               </p>
             </div>
@@ -235,10 +238,10 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
                       className="poster-img"
                     />
                     <div className="card-overlay">
-                      <button className="quick-play-btn" style={{ width: '100%' }}>
-                        <Play size={15} fill="#fff" />
+                      <Button variant="default" size="sm" style={{ width: '100%' }}>
+                        <Play size={13} fill="currentColor" />
                         <span>Ver Ficha</span>
-                      </button>
+                      </Button>
                     </div>
                   </div>
                   <div className="card-info">
@@ -259,14 +262,14 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
 
       {/* HISTORIAL TAB */}
       {activeTab === 'history' && (
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-glass)', borderRadius: '16px', padding: '16px' }}>
+        <div style={{ border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius-lg)', backgroundColor: 'hsl(var(--card))', padding: '1rem' }}>
           {historyList.length === 0 ? (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Clock size={36} color="var(--text-dim)" style={{ margin: '0 auto 12px' }} />
-              <p>No hay títulos en el historial.</p>
+            <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'hsl(var(--muted-foreground))' }}>
+              <Clock size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+              <p style={{ fontSize: '0.875rem' }}>No hay títulos en el historial.</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {historyList.map((h, i) => (
                 <div 
                   key={i}
@@ -274,21 +277,21 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid var(--border-glass)'
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'hsl(var(--muted) / 0.3)'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img 
                       src={h.poster || 'https://images.metahub.space/poster/small/default.png'} 
                       alt={h.name} 
-                      style={{ width: '38px', height: '54px', borderRadius: '6px', objectFit: 'cover' }}
+                      style={{ width: '2.25rem', height: '3.25rem', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
                     />
                     <div>
-                      <h4 style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 600 }}>{h.name}</h4>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                      <h4 style={{ fontSize: '0.875rem', color: 'hsl(var(--foreground))', fontWeight: 600 }}>{h.name}</h4>
+                      <div style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))', marginTop: '2px' }}>
                         <span>Stream: {h.streamName || 'AIOStreams'}</span>
                         <span style={{ margin: '0 6px' }}>•</span>
                         <span>{new Date(h.watchedAt).toLocaleDateString()}</span>
@@ -296,13 +299,13 @@ export const LibraryView = ({ onSelectMedia, onResumePlayback }) => {
                     </div>
                   </div>
 
-                  <button 
-                    className="btn-secondary" 
-                    style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                  <Button 
+                    variant="outline" 
+                    size="sm"
                     onClick={() => onSelectMedia({ id: h.id, name: h.name, type: h.type, poster: h.poster })}
                   >
                     Ver
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
